@@ -6,24 +6,10 @@ import com.wordnik.swagger.models.*;
 import com.wordnik.swagger.models.auth.SecuritySchemeDefinition;
 import com.wordnik.swagger.models.properties.Property;
 import com.wordnik.swagger.util.Json;
-
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
-import java.io.File;
-import java.io.Reader;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.io.*;
+import java.util.*;
 
 import static org.apache.commons.lang3.StringUtils.capitalize;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
@@ -112,7 +98,35 @@ public class DefaultGenerator extends AbstractGenerator implements Generator {
 
       // models
       Map<String, Model> definitions = swagger.getDefinitions();
+
+
+      // This needs to be two passes.
+      // First is to rehydrate all the partials
+      // Second is to implement the full models.
       if (definitions != null) {
+//        Map<String, ComposedModel> composed =
+//                definitions.entrySet().stream().
+//                        filter(e -> e.getValue() instanceof ComposedModel).
+//                        collect(Collectors.toMap(
+//                                        e -> e.getKey(),
+//                                        e -> (ComposedModel) e.getValue()
+//                                )
+//                );
+
+        Map<String, ComposedModel> composed = new HashMap<String, ComposedModel>();
+        for (Map.Entry<String, Model> entry : definitions.entrySet()) {
+          if (entry.getValue() instanceof ComposedModel) {
+            composed.put(entry.getKey(), (ComposedModel) entry.getValue());
+          }
+        }
+
+        if (!composed.isEmpty()) {
+          for (Map.Entry<String, ComposedModel> entry: composed.entrySet()) {
+            Model fullModel = recompose(entry.getValue(), definitions);
+            definitions.put(entry.getKey(), fullModel);
+          }
+        }
+
         for (String name : definitions.keySet()) {
           Model model = definitions.get(name);
           Map<String, Model> modelMap = new HashMap<String, Model>();
@@ -281,6 +295,22 @@ public class DefaultGenerator extends AbstractGenerator implements Generator {
     return files;
   }
 
+  protected Model recompose(ComposedModel composed, Map<String, Model> allModels) {
+    ModelImpl impl = new ModelImpl();
+
+    for (Model referred : composed.getAllOf()) {
+      Model instance = allModels.get(((RefModel) referred).getSimpleRef());
+
+      // avoid null pointers here.  Yeesh.
+      if (instance.getProperties() != null) {
+        for (Map.Entry<String, Property> entry : instance.getProperties().entrySet()) {
+          impl.addProperty(entry.getKey(), entry.getValue());
+        }
+      }
+    }
+    return impl;
+  }
+  
   public Map<String, List<CodegenOperation>> processPaths(Map<String, Path> paths) {
     Map<String, List<CodegenOperation>> ops = new HashMap<String, List<CodegenOperation>>();
 

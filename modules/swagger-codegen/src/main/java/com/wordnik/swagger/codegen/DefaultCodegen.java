@@ -420,36 +420,59 @@ public class DefaultCodegen {
     return initialCaps(name);
   }
 
+
+  protected CodegenModel adaptRefModel(CodegenModel base, RefModel refModel) {
+    return base;
+  }
+
+
   public CodegenModel fromModel(String name, Model model) {
-    CodegenModel m = CodegenModelFactory.newInstance(CodegenModelType.MODEL);
+    CodegenModel cgModel = CodegenModelFactory.newInstance(CodegenModelType.MODEL);
     if(reservedWords.contains(name))
-      m.name = escapeReservedWord(name);
+      cgModel.name = escapeReservedWord(name);
     else
-      m.name = name;
-    m.description = escapeText(model.getDescription());
-    m.classname = toModelName(name);
-    m.classVarName = toVarName(name);
-    m.modelJson = Json.pretty(model);
-    m.externalDocs = model.getExternalDocs();
-    int count = 0;
+      cgModel.name = name;
+    cgModel.description = escapeText(model.getDescription());
+    cgModel.classname = toModelName(name);
+    cgModel.classVarName = toVarName(name);
+    cgModel.modelJson = Json.pretty(model);
+    cgModel.externalDocs = model.getExternalDocs();
     if(model instanceof ArrayModel) {
       ArrayModel am = (ArrayModel) model;
       ArrayProperty arrayProperty = new ArrayProperty(am.getItems());
       CodegenProperty cp = fromProperty(name, arrayProperty);
       if(cp.complexType != null && !defaultIncludes.contains(cp.complexType))
-        m.imports.add(cp.complexType);
-      m.parent = toInstantiationType(arrayProperty);
+        cgModel.imports.add(cp.complexType);
+      cgModel.parent = toInstantiationType(arrayProperty);
       String containerType = cp.containerType;
       if(instantiationTypes.containsKey(containerType))
-        m.imports.add(instantiationTypes.get(containerType));
+        cgModel.imports.add(instantiationTypes.get(containerType));
       if(typeMapping.containsKey(containerType)) {
         containerType = typeMapping.get(containerType);
         cp.containerType = containerType;
-        m.imports.add(containerType);
+        cgModel.imports.add(containerType);
       }
     }
     else if (model instanceof RefModel) {
       // TODO
+    }
+    else if (model instanceof ComposedModel) {
+      ComposedModel composed = (ComposedModel) model;
+//      if(composed.getAdditionalProperties() != null) {
+//        MapProperty mapProperty = new MapProperty(composed.getAdditionalProperties());
+//        CodegenProperty cp = fromProperty(name, mapProperty);
+//        if(cp.complexType != null && !defaultIncludes.contains(cp.complexType))
+//          cgModel.imports.add(cp.complexType);
+//        cgModel.parent = toInstantiationType(mapProperty);
+//        String containerType = cp.containerType;
+//        if(instantiationTypes.containsKey(containerType))
+//          cgModel.imports.add(instantiationTypes.get(containerType));
+//        if(typeMapping.containsKey(containerType)) {
+//          containerType = typeMapping.get(containerType);
+//          cp.containerType = containerType;
+//          cgModel.imports.add(containerType);
+//        }
+//      }
     }
     else {
       ModelImpl impl = (ModelImpl) model;
@@ -457,19 +480,20 @@ public class DefaultCodegen {
         MapProperty mapProperty = new MapProperty(impl.getAdditionalProperties());
         CodegenProperty cp = fromProperty(name, mapProperty);
         if(cp.complexType != null && !defaultIncludes.contains(cp.complexType))
-          m.imports.add(cp.complexType);
-        m.parent = toInstantiationType(mapProperty);
+          cgModel.imports.add(cp.complexType);
+        cgModel.parent = toInstantiationType(mapProperty);
         String containerType = cp.containerType;
         if(instantiationTypes.containsKey(containerType))
-          m.imports.add(instantiationTypes.get(containerType));
+          cgModel.imports.add(instantiationTypes.get(containerType));
         if(typeMapping.containsKey(containerType)) {
           containerType = typeMapping.get(containerType);
           cp.containerType = containerType;
-          m.imports.add(containerType);
+          cgModel.imports.add(containerType);
         }
       }
       if(impl.getProperties() != null && impl.getProperties().size() > 0) {
-        m.hasVars = true;
+        cgModel.hasVars = true;
+        int count = 0;
         for(String key: impl.getProperties().keySet()) {
           Property prop = impl.getProperties().get(key);
 
@@ -477,53 +501,53 @@ public class DefaultCodegen {
             LOGGER.warn("null property for " + key);
           }
           else {
-            CodegenProperty cp;
+            CodegenProperty cgProp;
             try{
-              cp = fromProperty(key, prop);
+              cgProp = fromProperty(key, prop);
             }
             catch(Exception e) {
               System.out.println("failed to process model " + name);
               throw new RuntimeException(e);
             }
-            cp.required = null;
+            cgProp.required = null;
             if(impl.getRequired() != null) {
               for(String req : impl.getRequired()) {
                 if(key.equals(req))
-                  cp.required = true;
+                  cgProp.required = true;
               }
             }
-            if(cp.complexType != null && !defaultIncludes.contains(cp.complexType)) {
-              m.imports.add(cp.complexType);
+            if(cgProp.complexType != null && !defaultIncludes.contains(cgProp.complexType)) {
+              cgModel.imports.add(cgProp.complexType);
             }
-            m.vars.add(cp);
+            cgModel.vars.add(cgProp);
             count += 1;
             if(count != impl.getProperties().keySet().size())
-              cp.hasMore = new Boolean(true);
-            if(cp.isContainer != null) {
+              cgProp.hasMore = new Boolean(true);
+            if(cgProp.isContainer != null) {
               String arrayImport = typeMapping.get("array");
               if(arrayImport != null &&
                 !languageSpecificPrimitives.contains(arrayImport) && 
                 !defaultIncludes.contains(arrayImport))
-                m.imports.add(arrayImport);
+                cgModel.imports.add(arrayImport);
             }
 
-            if(cp.complexType != null &&
-              !languageSpecificPrimitives.contains(cp.complexType) && 
-              !defaultIncludes.contains(cp.complexType))
-              m.imports.add(cp.complexType);
+            if(cgProp.complexType != null &&
+              !languageSpecificPrimitives.contains(cgProp.complexType) &&
+              !defaultIncludes.contains(cgProp.complexType))
+              cgModel.imports.add(cgProp.complexType);
 
-            if(cp.baseType != null &&
-              !languageSpecificPrimitives.contains(cp.baseType) && 
-              !defaultIncludes.contains(cp.baseType))
-              m.imports.add(cp.baseType);
+            if(cgProp.baseType != null &&
+              !languageSpecificPrimitives.contains(cgProp.baseType) &&
+              !defaultIncludes.contains(cgProp.baseType))
+              cgModel.imports.add(cgProp.baseType);
           }
         }
       }
       else {
-        m.emptyVars = true;
+        cgModel.emptyVars = true;
       }
     }
-    return m;
+    return cgModel;
   }
 
   public String getterAndSetterCapitalize(String name) {
