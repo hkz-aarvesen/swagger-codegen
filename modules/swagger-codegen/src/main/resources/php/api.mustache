@@ -27,6 +27,7 @@ class {{classname}} {
 
   function __construct($apiClient) {
     $this->apiClient = $apiClient;
+    $this->apiClient->model_package = __NAMESPACE__;
   }
 
   {{#operation}}

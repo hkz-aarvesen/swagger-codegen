@@ -25,7 +25,12 @@ class APIClient {
   public static $PUT = "PUT";
   public static $DELETE = "DELETE";
   
-  private static $default_header = array();
+  private $default_headers = array();
+
+  /*
+   * @var string The package used for model objects.  This allows the APIClient to be easily used across packages.
+   */
+  public $model_package = "{{escapedInvokerPackage}}";
 
   /*
    * @var string timeout (second) of the HTTP request, by default set to 0, no timeout
@@ -40,12 +45,17 @@ class APIClient {
   /**
    * @param string $host Base url of the API server (optional)
    */
-  function __construct($host = null) {
+  function __construct($host = null, $header_name = null, $header_value = null) {
     if ($host == null) {
       $this->host = '{{basePath}}';
     } else {
       $this->host = $host;
     }
+
+    if ($header_name !== null && $header_value !== null) {
+      $this->addDefaultHeader($header_name, $header_value);
+    }
+
     // set to null to avoid E_STRICT warnings
     $this->curl_timeout = null;
     $this->user_agent = null;
@@ -61,7 +71,7 @@ class APIClient {
     if (!is_string($header_name)) 
       throw new \InvalidArgumentException('Header name must be a string.');
 
-    self::$default_header[$header_name] =  $header_value;
+    $this->default_headers[$header_name] =  $header_value;
   }
 
   /**
@@ -69,8 +79,8 @@ class APIClient {
    *
    * @return array default header
    */
-  public function getDefaultHeader() {
-    return self::$default_header;
+  public function getDefaultHeaders() {
+    return $this->default_headers;
   }
 
   /**
@@ -79,7 +89,7 @@ class APIClient {
    * @param string $header_name header name (e.g. Token)
    */
   public function deleteDefaultHeader($header_name) {
-    unset(self::$default_header[$header_name]);
+    unset($this->default_headers[$header_name]);
   }
 
   /**
@@ -164,7 +174,7 @@ class APIClient {
     # construct the http header
     if ($headerParams != null) {
       # add default header
-      $headerParams = array_merge((array)self::$default_header, $headerParams);
+      $headerParams = array_merge((array)$this->default_headers, $headerParams);
 
       foreach ($headerParams as $key => $val) {
         $headers[] = "$key: $val";
@@ -339,7 +349,7 @@ class APIClient {
    * @param string $class class name is passed as a string
    * @return object an instance of $class
    */
-  public static function deserialize($data, $class)
+  public function deserialize($data, $class)
   {
     // translate json schema types to valid php types
     $translateTypes = array(
@@ -377,7 +387,7 @@ class APIClient {
       settype($data, $translateTypes[$class]);
       $deserialized = $data;
     } else {
-      $class = "{{invokerPackage}}\\models\\".$class;
+      $class = $this->model_package."\\models\\".$class;
       $instance = new $class();
       foreach ($instance::$swaggerTypes as $property => $type) {
         $original_property_name = $instance::$attributeMap[$property];
