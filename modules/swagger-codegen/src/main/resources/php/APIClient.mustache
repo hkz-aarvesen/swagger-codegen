@@ -384,7 +384,6 @@ class APIClient {
       settype($data, $class);
       $deserialized = $data;
     } elseif (gettype($data) == 'array') {      // Add support for nested arrays
-      settype($data, 'array');
       $deserialized = $data;
     } elseif (isset($translateTypes[$class])) {
       settype($data, $translateTypes[$class]);
