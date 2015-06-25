@@ -39,25 +39,53 @@ class {{classname}} implements ArrayAccess {
       {{/hasMore}}{{/vars}}
   );
 
-  public $hasValue = array();
-  {{#vars}}{{#description}}
+  // keeps track of which values are set.  Important when you don't want to submit every value.
+  public $hasValue  = array();
+
+  // lets us keep $hasValue in sync when doing $this->somevar = 1;
+  private $storage  = array();
+
   /**
-  * {{{description}}}
-  */{{/description}}
-  public ${{name}}; /* {{{datatype}}} */{{/vars}}
+   * Variables (if any){{#vars}}
+   * {{name}} {{datatype}}{{#description}}
+   *     {{{description}}}{{/description}}{{/vars}}
+   */
 
   public function __construct(array $data = null) {
-    if (null === $data) {
-      return;
-    }
 {{#vars}}    $this->setIfExists("{{name}}", $data);
 {{/vars}}
   }
 
   private function setIfExists($name, $data) {
-    $this->hasValue[$name] = array_key_exists($name, $data);
-    if ($this->hasValue[$name]) {
+    if (null !== $data && array_key_exists($name, $data)) {
       $this->$name = $data[$name];
+    } else {
+      $this->hasValue[$name] = false;
+    }
+  }
+
+  public function __get($name) {
+    if ($this->hasValue[$name]) {
+      return $this->storage[$name];
+    }
+    $trace = debug_backtrace();
+    trigger_error(
+        'Undefined property via __get(): ' . $name .
+        ' in ' . $trace[0]['file'] .
+        ' on line ' . $trace[0]['line'],
+        E_USER_NOTICE);
+    return null;
+  }
+
+  public function __set($name, $value) {
+    $this->storage[$name]  = $value;
+    $this->hasValue[$name] = true;
+  }
+
+  public function __unset($name) {
+    if ($this->hasValue[$name]) {
+      $this->hasValue[$name] = false;
+      unset($storage[$name]);
     }
   }
 
