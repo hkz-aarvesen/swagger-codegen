@@ -65,16 +65,20 @@ class {{classname}} implements ArrayAccess {
   }
 
   public function __get($name) {
-    if ($this->hasValue[$name]) {
-      return $this->storage[$name];
+    $value = null;
+    if (! array_key_exists($name, self::$attributeMap)) {
+      $trace = debug_backtrace();
+      trigger_error(
+          'Undefined property via __get(): ' . $name .
+          ' in ' . $trace[0]['file'] .
+          ' on line ' . $trace[0]['line'],
+          E_USER_NOTICE);
+    } else {
+      if ($this->hasValue[$name]) {
+        $value = $this->storage[$name];
+      }
     }
-    $trace = debug_backtrace();
-    trigger_error(
-        'Undefined property via __get(): ' . $name .
-        ' in ' . $trace[0]['file'] .
-        ' on line ' . $trace[0]['line'],
-        E_USER_NOTICE);
-    return null;
+    return $value;
   }
 
   public function __set($name, $value) {
@@ -89,6 +93,13 @@ class {{classname}} implements ArrayAccess {
     }
   }
 
+  public function __isset($name) {
+    $value = false;
+    if ($this->hasValue[$name]) {
+      $value = isset($this->storage[$name]);
+    }
+    return $value;
+  }
   public function offsetExists($offset) {
     return isset($this->$offset);
   }
