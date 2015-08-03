@@ -139,7 +139,7 @@ class Paginator implements \Iterator
     public function valid()
     {
         $valid = false;
-        if ($this->invalid) {
+        if (! $this->invalid) {
             if (isset($this->backer->results) && isset($this->backer->results[$this->index])) {
                 $valid = true;
             }
