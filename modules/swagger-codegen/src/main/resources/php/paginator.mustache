@@ -1,0 +1,170 @@
+<?php
+
+namespace {{invokerPackage}};
+
+
+class Paginator implements \Iterator
+{
+
+
+    /** @var  int */
+    private $index;
+
+    private $backer;
+
+    /** @var  \wpengine\common\APIClient */
+    private $api;
+
+    /** @var  string */
+    private $modelName;
+
+    /**
+     * The host name in the api client may have an embedded path element. I.e. the
+     * host might be "billing.com/v1".  Pre-parse this so we can remove during our next
+     * and previous calls.
+     *
+     * @var  string
+     */
+    private $embeddedPath;
+
+    /**
+     * Force invalid in case you cannot call the next/previous URL
+     *
+     * @var bool
+     */
+    private $invalid;
+
+    public function __construct($api, $backer)
+    {
+        $this->api     = $api;
+        $this->backer  = $backer;
+        $this->invalid = false;
+
+        $reflect = new \ReflectionClass($backer);
+        $this->modelName = $reflect->getShortName();
+
+        $pieces = parse_url($this->api->host);
+        $this->embeddedPath = $pieces['path'];
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Return the current element
+     * @link http://php.net/manual/en/iterator.current.php
+     * @return mixed Can return any type.
+     */
+    public function current()
+    {
+        return $this->backer->results[$this->index];
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Move forward to next element
+     * @link http://php.net/manual/en/iterator.next.php
+     * @return void Any returned value is ignored.
+     */
+    public function next()
+    {
+        $this->index++;
+
+        if ($this->index >= count($this->backer->results)) {
+            if ($this->backer->next !== null) {
+                $response = $this->loadData($this->backer->next);
+                if ($response) {
+                    $this->backer = $this->api->deserialize($response, $this->modelName);
+                    $this->index = 0;
+                }
+            }
+        }
+    }
+
+    protected function getLocator($url, $includeParams = true) {
+        $pieces = parse_url($url);
+        $result = $pieces["path"];
+
+        if ($this->embeddedPath) {
+            $result = substr($result, strlen($this->embeddedPath));
+        }
+
+        if ($includeParams) {
+            if (isset($pieces["query"])) {
+                $result .= '?' . $pieces["query"];
+            }
+            if (isset($pieces["fragment"])) {
+                $result .= '#' . $pieces["fragment"];
+            }
+        }
+        return $result;
+    }
+
+    protected function loadData($url, $includeParams = true) {
+        $method = "GET";
+        $httpBody = '';
+        $queryParams = array();
+        $headerParams = array();
+        $headerParams['Content-Type'] = $this->api->selectHeaderContentType(array());
+        $authSettings = array();
+
+        $locator  = $this->getLocator($url, $includeParams);
+        $response = $this->api->callAPI($locator, $method,
+                                        $queryParams, $httpBody,
+                                        $headerParams, $authSettings);
+
+        if (! $response) {
+            $this->invalid = true;
+        }
+
+        return $response;
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Return the key of the current element
+     * @link http://php.net/manual/en/iterator.key.php
+     * @return mixed scalar on success, or null on failure.
+     */
+    public function key()
+    {
+        return $this->index;
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Checks if current position is valid
+     * @link http://php.net/manual/en/iterator.valid.php
+     * @return boolean The return value will be casted to boolean and then evaluated.
+     * Returns true on success or false on failure.
+     */
+    public function valid()
+    {
+        $valid = false;
+        if ($this->invalid) {
+            if (isset($this->backer->results) && isset($this->backer->results[$this->index])) {
+                $valid = true;
+            }
+        }
+        return $valid;
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Rewind the Iterator to the first element
+     *
+     * Note that "[t]his is the first method called when starting a foreach loop."
+     * @link http://php.net/manual/en/iterator.rewind.php
+     * @return void Any returned value is ignored.
+     */
+    public function rewind()
+    {
+        if ($this->backer->previous !== null) {
+            $response = $this->loadData($this->backer->previous, false);
+            if ($response) {
+                $this->backer = $this->api->deserialize($response, $this->modelName);
+                $this->rewind();
+            }
+        }
+        $this->index = 0;
+    }
+
+}

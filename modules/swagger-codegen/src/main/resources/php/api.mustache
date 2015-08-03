@@ -106,6 +106,17 @@ class {{classname}} {
       }
 
       $responseObject = $this->apiClient->deserialize($response,'{{returnType}}');
+
+      $pageable = true;
+      foreach (array('count', 'next', 'previous', 'results') as $attribute) {
+        if (! array_key_exists($attribute, $responseObject::$attributeMap)) {
+            $pageable = false;
+            break;
+        }
+      }
+      if ($pageable) {
+         $responseObject = new \wpengine\common\Paginator($this->apiClient, $responseObject);
+      }
       return $responseObject;{{/returnType}}
   }
   {{/operation}}

@@ -90,6 +90,7 @@ public class PhpClientCodegen extends DefaultCodegen implements CodegenConfig {
 
     SupportingFileMap sfm = new SupportingFileMap();
     sfm.add(new SupportingFile("composer.mustache", packagePath, "composer.json"));
+    sfm.add(new SupportingFile("paginator.mustache", packagePath + "/lib", "Paginator.php"));
     sfm.add(new SupportingFile("APIClient.mustache", packagePath + "/lib", "APIClient.php"));
     sfm.add(new SupportingFile("APIClientException.mustache", packagePath + "/lib", "APIClientException.php"));
     sfm.add(new SupportingFile("configuration.mustache", packagePath + "/lib", "Configuration.php"));
@@ -234,7 +235,7 @@ public class PhpClientCodegen extends DefaultCodegen implements CodegenConfig {
     if (name.matches("^[0-9]")) {
       name = "_" + name;
     }
-    
+
     // return the name in underscore style
     // PhoneNumber => phone_number
     return underscore(name);
