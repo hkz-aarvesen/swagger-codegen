@@ -89,7 +89,7 @@ class {{classname}} implements ArrayAccess {
   public function __unset($name) {
     if ($this->hasValue[$name]) {
       $this->hasValue[$name] = false;
-      unset($storage[$name]);
+      unset($this->storage[$name]);
     }
   }
 
